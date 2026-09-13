@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Добавление</title>
+    <link rel="stylesheet" href="/static/css/particles.css">
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="draft-page">
+
+            <div class="draft-header">РАСЧЕТ ДЛИНЫ ВОЛНЫ ДЕ БРОЙЛЯ ДЛЯ ЧАСТИЦ</div>
+            <h1 class="draft-title">Добавить</h1>
+
+            <!-- БЛОК С МЕДИА (КАРТИНКА И ВИДЕО) -->
+            <div class="media-fields">
+                <div class="media-box">
+                    <img src="{{.ImageURL}}" alt="Изображение">
+                    <span class="media-label">Изображение</span>
+                </div>
+                <div class="media-box">
+                    <video src="{{.VideoURL}}" muted autoplay loop playsinline></video>
+                    <span class="media-label">Видео</span>
+                </div>
+            </div>
+
+            <div class="draft-form">
+                <div class="text-fields">
+                    <div class="field">
+                        <label for="name">Название</label>
+                        <input id="name" name="name" type="text" value="{{.Particle.Name}}">
+                    </div>
+
+                    <div class="field">
+                        <label for="mass">Масса частицы (кг)</label>
+                        <input id="mass" name="mass" type="number" min="0" step="any" value="{{.Particle.Mass}}">
+                    </div>
+
+                    <div class="field">
+                        <label for="spin">Спин</label>
+                        <input id="spin" name="spin" type="text" value="{{.Particle.Spin}}">
+                    </div>
+
+                    <div class="field">
+                        <label for="wavelength">Длина волны де Бройля (м)</label>
+                        <input id="wavelength" name="wavelength" type="number" min="0" step="any" value="{{.Particle.Wavelength}}">
+                    </div>
+
+                    <div class="field">
+                        <label for="description">Описание</label>
+                        <textarea id="description" name="description" placeholder="Введите описание частицы...">{{.Particle.FullDescription}}</textarea>
+                    </div>
+
+                    <div class="field">
+                        <label for="status">Статус</label>
+                        <input id="status" type="text" value="Черновик" class="white-input" readonly>
+                    </div>
+                </div>
+
+                <button type="button" class="save-btn" disabled aria-disabled="true">Сохранить</button>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <a href="/feed" class="nav-item">
+                <span class="nav-icon">⌂</span>
+                <span>Лента</span>
+            </a>
+            <a href="/draft" class="nav-item active">
+                <span class="nav-icon">＋</span>
+                <span>Добавить</span>
+            </a>
+            <a href="/cards" class="nav-item">
+                <span class="nav-icon">▦</span>
+                <span>Плитка</span>
+            </a>
+        </nav>
+    </div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Плитка</title>
+    <link rel="stylesheet" href="/static/css/particles.css">
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="cards-page">
+
+            <div class="cards-header">РАСЧЕТ ДЛИНЫ ВОЛНЫ ДЕ БРОЙЛЯ ДЛЯ ЧАСТИЦ</div>
+
+            <div class="filter-section">
+                <form method="GET" action="/cards" class="filter-form">
+                    <label for="mass-filter" class="filter-label">
+                        Фильтрация по массе
+                    </label>
+                    <div class="filter-controls">
+                        <div class="slider-wrap">
+                            <input type="range"
+                                   id="mass-filter"
+                                   name="filter"
+                                   class="filter-input"
+                                   min="0"
+                                   max="{{.FilterSteps}}"
+                                   step="1"
+                                   value="{{.Filter}}"
+                                   data-min-mass="{{.MinMass}}"
+                                   data-max-mass="{{.MaxMass}}">
+                            <div class="filter-scale">
+                                <span>0 кг</span>
+                                <output id="mass-output" for="mass-filter">{{.FilterLabel}}</output>
+                                <span>{{printf "%.1e" .MaxMass}} кг</span>
+                            </div>
+                        </div>
+                        <button type="submit" class="filter-btn">Найти</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-grid">
+                {{range .Cards}}
+                <a href="/feed?id={{.Particle.ID}}" class="card-item">
+                    <img class="card-image" src="{{.ImageURL}}" alt="{{.Particle.Name}}">
+                    <div class="card-body">
+                        <div class="card-head">
+                            <span class="card-name">{{.Particle.Name}}</span>
+                            <span class="card-likes">
+                                <svg class="card-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                                <span>{{.LikesCount}}</span>
+                            </span>
+                        </div>
+                        <div class="card-mass">{{.Particle.Mass}} кг</div>
+                    </div>
+                </a>
+                {{end}}
+            </div>
+
+        </div>
+
+        <nav class="bottom-nav">
+            <a href="/feed" class="nav-item">
+                <span class="nav-icon">⌂</span>
+                <span>Лента</span>
+            </a>
+            <a href="/draft" class="nav-item">
+                <span class="nav-icon">＋</span>
+                <span>Добавить</span>
+            </a>
+            <a href="/cards" class="nav-item active">
+                <span class="nav-icon">▦</span>
+                <span>Плитка</span>
+            </a>
+        </nav>
+    </div>
+    <script>
+        (() => {
+            const slider = document.getElementById('mass-filter');
+            const output = document.getElementById('mass-output');
+            const minMass = Number(slider.dataset.minMass);
+            const maxMass = Number(slider.dataset.maxMass);
+            const steps = Number(slider.max);
+
+            slider.addEventListener('input', () => {
+                const position = Number(slider.value);
+                if (position === 0) {
+                    output.textContent = '0 кг';
+                    return;
+                }
+                const fraction = (position - 1) / (steps - 1);
+                const mass = minMass * Math.pow(maxMass / minMass, fraction);
+                output.textContent = `${mass.toExponential(3)} кг`;
+            });
+        })();
+    </script>
+</body>
+</html>
