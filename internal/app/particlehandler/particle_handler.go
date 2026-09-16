@@ -17,7 +17,11 @@ import (
 
 var particleTemplates = template.Must(template.ParseFS(particleassets.ParticleFiles, "resources/templates/*.html"))
 
-const ParticleMediaBaseURL = "http://localhost:9000/de-broglie/"
+const (
+	ParticleMediaBaseURL = "http://localhost:9000/de-broglie/"
+	DefaultImageKey      = "default.jpg" // ← ключ в MinIO
+	DefaultVideoKey      = "default.mp4" // ← ключ в MinIO
+)
 
 func NewParticleMux() *http.ServeMux {
 	mux := http.NewServeMux()
@@ -27,9 +31,17 @@ func NewParticleMux() *http.ServeMux {
 		panic(err)
 	}
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	// GET
 	mux.HandleFunc("GET /feed", ParticleFeedHandler)
 	mux.HandleFunc("GET /draft", ParticleDraftHandler)
 	mux.HandleFunc("GET /cards", ParticleCardsHandler)
+
+	// POST
+	mux.HandleFunc("POST /draft", ParticleCreateHandler)
+	mux.HandleFunc("POST /publish", ParticlePublishHandler)
+	mux.HandleFunc("POST /delete", ParticleDeleteHandler)
+
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/feed", http.StatusSeeOther)
 	})
@@ -49,7 +61,16 @@ func renderParticleTemplate(w http.ResponseWriter, particleTemplateName string, 
 	}
 }
 
-// ===================== /feed =====================
+// mediaURL — возвращает полный URL файла из MinIO.
+// Если ключ пустой — возвращает URL файла по умолчанию (тоже из MinIO).
+func mediaURL(key, baseURL, defaultKey string) string {
+	if key == "" {
+		return baseURL + defaultKey
+	}
+	return baseURL + key
+}
+
+// GET /feed
 
 func ParticleFeedHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
@@ -110,42 +131,44 @@ func ParticleFeedHandler(w http.ResponseWriter, r *http.Request) {
 		HasNext    bool
 	}{
 		Particle:   *particle,
-		ImageURL:   ParticleMediaBaseURL + particle.ImageKey,
-		VideoURL:   ParticleMediaBaseURL + particle.VideoKey,
-		LikesCount: particlerepository.GetParticleLikesCount(particle.Likes),
+		ImageURL:   mediaURL(particle.ImageKey, ParticleMediaBaseURL, DefaultImageKey),
+		VideoURL:   mediaURL(particle.VideoKey, ParticleMediaBaseURL, DefaultVideoKey),
+		LikesCount: particlerepository.GetParticleLikesCount(particle.ID),
 		HasNext:    hasNext,
 	}
 
 	renderParticleTemplate(w, "particle_feed.html", particleFeedData)
 }
 
-// ===================== /draft =====================
+//  GET /draft
 
 func ParticleDraftHandler(w http.ResponseWriter, r *http.Request) {
 	particle := particlerepository.GetDraftParticle()
-	if particle == nil {
-		http.Error(w, "Нет черновика", http.StatusNotFound)
-		return
-	}
 
 	particleDraftData := struct {
 		Particle particlerepository.Particle
 		ImageURL string
 		VideoURL string
+		HasDraft bool
 	}{
-		Particle: *particle,
-		ImageURL: ParticleMediaBaseURL + particle.ImageKey,
-		VideoURL: ParticleMediaBaseURL + particle.VideoKey,
+		ImageURL: ParticleMediaBaseURL + DefaultImageKey,
+		VideoURL: ParticleMediaBaseURL + DefaultVideoKey,
+		HasDraft: particle != nil,
+	}
+
+	if particle != nil {
+		particleDraftData.Particle = *particle
+		particleDraftData.ImageURL = mediaURL(particle.ImageKey, ParticleMediaBaseURL, DefaultImageKey)
+		particleDraftData.VideoURL = mediaURL(particle.VideoKey, ParticleMediaBaseURL, DefaultVideoKey)
 	}
 
 	renderParticleTemplate(w, "particle_draft.html", particleDraftData)
 }
 
-// ===================== /cards =====================
+// GET /cards
 
 func ParticleCardsHandler(w http.ResponseWriter, r *http.Request) {
 	const filterSteps = 100
-	const maxCards = 4
 
 	filterPosition := 0
 	if filter := r.URL.Query().Get("filter"); filter != "" {
@@ -179,14 +202,11 @@ func ParticleCardsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var particleCards []ParticleCardData
-	for i, p := range particles {
-		if i >= maxCards {
-			break
-		}
+	for _, p := range particles {
 		particleCards = append(particleCards, ParticleCardData{
 			Particle:   p,
-			ImageURL:   ParticleMediaBaseURL + p.ImageKey,
-			LikesCount: particlerepository.GetParticleLikesCount(p.Likes),
+			ImageURL:   mediaURL(p.ImageKey, ParticleMediaBaseURL, DefaultImageKey),
+			LikesCount: particlerepository.GetParticleLikesCount(p.ID),
 		})
 	}
 
@@ -228,4 +248,103 @@ func particleMassRange(particles []particlerepository.Particle) (float64, float6
 		return 0, maxMass
 	}
 	return minMass, maxMass
+}
+
+//  POST /draft
+
+func ParticleCreateHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Ошибка формы", http.StatusBadRequest)
+		return
+	}
+
+	existingDraft := particlerepository.GetDraftParticle()
+	if existingDraft != nil {
+		http.Redirect(w, r, "/draft", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	if name == "" {
+		http.Error(w, "Название обязательно", http.StatusBadRequest)
+		return
+	}
+
+	mass, _ := strconv.ParseFloat(r.FormValue("mass"), 64)
+	spin := r.FormValue("spin")
+	wavelength, _ := strconv.ParseFloat(r.FormValue("wavelength"), 64)
+
+	particle := &particlerepository.Particle{
+		Name:       name,
+		Mass:       mass,
+		Spin:       spin,
+		Wavelength: wavelength,
+		Status:     particlerepository.StatusDraft,
+		CreatorID:  1,
+	}
+
+	if err := particlerepository.CreateParticle(particle); err != nil {
+		http.Error(w, "Ошибка создания частицы", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/draft", http.StatusSeeOther)
+}
+
+//  POST /publish
+
+func ParticlePublishHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Ошибка формы", http.StatusBadRequest)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "Некорректный ID", http.StatusBadRequest)
+		return
+	}
+
+	mass, _ := strconv.ParseFloat(r.FormValue("mass"), 64)
+	wavelength, _ := strconv.ParseFloat(r.FormValue("wavelength"), 64)
+
+	updates := map[string]interface{}{
+		"name":             r.FormValue("name"),
+		"mass":             mass,
+		"spin":             r.FormValue("spin"),
+		"wavelength":       wavelength,
+		"full_description": r.FormValue("full_description"),
+		"status":           particlerepository.StatusPublished,
+	}
+
+	if err := particlerepository.UpdateParticle(uint(id), updates); err != nil {
+		http.Error(w, "Ошибка публикации", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/cards", http.StatusSeeOther)
+}
+
+//  POST /delete
+
+func ParticleDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Ошибка формы", http.StatusBadRequest)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "Некорректный ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := particlerepository.DeleteParticleSQL(uint(id)); err != nil {
+		http.Error(w, "Ошибка удаления", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/cards", http.StatusSeeOther)
 }

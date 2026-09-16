@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres_particle:
+    image: postgres:17
+    container_name: particle_postgres
+    environment:
+      POSTGRES_USER: particle_user
+      POSTGRES_PASSWORD: particle_pass
+      POSTGRES_DB: particle_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - particle_postgres_data:/var/lib/postgresql/data
+
+  adminer_particle:
+    image: adminer
+    container_name: particle_adminer
+    ports:
+      - "8090:8080"
+    depends_on:
+      - postgres_particle
+
+volumes:
+  particle_postgres_data:

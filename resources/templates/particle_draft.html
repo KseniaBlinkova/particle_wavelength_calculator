@@ -13,7 +13,6 @@
             <div class="draft-header">РАСЧЕТ ДЛИНЫ ВОЛНЫ ДЕ БРОЙЛЯ ДЛЯ ЧАСТИЦ</div>
             <h1 class="draft-title">Добавить</h1>
 
-            <!-- БЛОК С МЕДИА (КАРТИНКА И ВИДЕО) -->
             <div class="media-fields">
                 <div class="media-box">
                     <img src="{{.ImageURL}}" alt="Изображение">
@@ -25,11 +24,14 @@
                 </div>
             </div>
 
-            <div class="draft-form">
+            {{if .HasDraft}}
+            <form method="POST" action="/publish" class="draft-form">
+                <input type="hidden" name="id" value="{{.Particle.ID}}">
+
                 <div class="text-fields">
                     <div class="field">
                         <label for="name">Название</label>
-                        <input id="name" name="name" type="text" value="{{.Particle.Name}}">
+                        <input id="name" name="name" type="text" value="{{.Particle.Name}}" required>
                     </div>
 
                     <div class="field">
@@ -48,8 +50,8 @@
                     </div>
 
                     <div class="field">
-                        <label for="description">Описание</label>
-                        <textarea id="description" name="description" placeholder="Введите описание частицы...">{{.Particle.FullDescription}}</textarea>
+                        <label for="full_description">Полное описание</label>
+                        <textarea id="full_description" name="full_description" placeholder="Введите полное описание...">{{.Particle.FullDescription}}</textarea>
                     </div>
 
                     <div class="field">
@@ -58,8 +60,37 @@
                     </div>
                 </div>
 
-                <button type="button" class="save-btn" disabled aria-disabled="true">Сохранить</button>
-            </div>
+                <button type="submit" class="publish-btn">Опубликовать</button>
+            </form>
+
+            {{else}}
+            <form method="POST" action="/draft" class="draft-form">
+                <div class="text-fields">
+                    <div class="field">
+                        <label for="name">Название</label>
+                        <input id="name" name="name" type="text" placeholder="Введите название" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="mass">Масса частицы (кг)</label>
+                        <input id="mass" name="mass" type="number" min="0" step="any" placeholder="Например, 9.11e-31">
+                    </div>
+
+                    <div class="field">
+                        <label for="spin">Спин</label>
+                        <input id="spin" name="spin" type="text" placeholder="Например, 1/2">
+                    </div>
+
+                    <div class="field">
+                        <label for="wavelength">Длина волны де Бройля (м)</label>
+                        <input id="wavelength" name="wavelength" type="number" min="0" step="any" placeholder="Например, 3.32e-10">
+                    </div>
+                </div>
+
+                <button type="submit" class="next-btn">Далее</button>
+            </form>
+            {{end}}
+
         </div>
 
         <nav class="bottom-nav">

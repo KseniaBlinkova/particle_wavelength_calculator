@@ -1,5 +1,3 @@
-
-/* ===== Переменные: 3 основных цвета + акценты ===== */
 :root {
     --color-dark:    #000000;
     --color-light:   #EBE2E1;
@@ -15,7 +13,6 @@
     --radius-card:  16px;
     --radius-field: 8px;
 
-    /* --font-sans:  'Inter', system-ui, sans-serif; */
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
 }
@@ -189,9 +186,15 @@ body {
 }
 .read-more::-webkit-details-marker { display: none; }
 .read-more:hover { opacity: 0.75; }
-.collapsed-description,
-.particle-description-text {
+.collapsed-description {
     display: block;
+}
+.particle-description-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 .read-more-label,
 .collapse-label {
@@ -306,9 +309,6 @@ body {
     align-items: center;   /* ← ЦЕНТРИРУЕМ ВСЁ */
 }
 
-/* ============================================================
-   МЕДИА-ПОЛЯ (КАРТИНКА И ВИДЕО) — ПО ЦЕНТРУ, 172×144
-   ============================================================ */
 
 .media-fields {
     display: flex;
@@ -356,7 +356,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    width: 100%;   /* ← растягиваем на всю ширину */
+    width: 100%; 
 }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
@@ -388,7 +388,7 @@ body {
     -webkit-appearance: none;
 }
 .field textarea {
-    height: 70px;          /* ← БЫЛО 100px, стало 70px (компактнее) */
+    height: 70px;     
     resize: vertical;
 }
 .field input:focus,
@@ -402,10 +402,9 @@ body {
     color: var(--color-muted-2);
 }
 
-/* Кнопка "Сохранить" — как в макете (чёрная, по центру, широкая) */
 .save-btn {
     align-self: center;
-    width: 200px;           /* ← БЫЛО 137px, стало 200px (шире) */
+    width: 200px;     
     height: 50px;
     background: #000;
     color: #fff;
@@ -418,19 +417,21 @@ body {
     margin-top: 8px;
 }
 
-/* Белое поле для статуса */
 .white-input {
     background: #FFFFFF !important;
     color: #1A1A2E !important;
     border: 1px solid #E9ECEF !important;
 }
 
-/* ================== ПЛИТКА ================== */
 .cards-page {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     background: var(--color-light);
 }
 
@@ -516,9 +517,9 @@ body {
 .filter-btn:hover { background: #333; transform: translateY(-1px); }
 
 .card-grid {
-    flex: 0 0 520px;
-    height: 520px;
-    overflow-y: auto;
+    flex: none;
+    height: auto;
+    overflow: visible;
     display: grid;
     grid-template-columns: repeat(2, 169px);
     grid-auto-rows: 240px;
@@ -591,4 +592,132 @@ body {
 .card-mass {
     font-size: 11px;
     color: var(--color-muted-2);
+}
+
+.card-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.delete-form {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+}
+
+.btn-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 99, 99, 0.9);
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.btn-delete:hover {
+    background: #FF6363;
+    transform: scale(1.1);
+}
+
+.save-btn {
+    align-self: center;
+    width: 200px;
+    height: 50px;
+    background: #000;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.save-btn:hover {
+    background: #333;
+    transform: translateY(-1px);
+}
+
+
+.publish-btn {
+    align-self: center;
+    width: 200px;
+    height: 50px;
+    background: #FFEEC6;
+    color: #000;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.publish-btn:hover {
+    background: #FFE5A0;
+    transform: translateY(-1px);
+}
+
+.publish-form {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+
+.next-btn {
+    align-self: center;
+    width: 200px;
+    height: 50px;
+    background: #000;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    margin-top: 16px;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.next-btn:hover {
+    background: #333;
+    transform: translateY(-1px);
+}
+
+.publish-btn {
+    align-self: center;
+    width: 180px;
+    min-height: 50px;      
+    height: 50px;       
+    flex-shrink: 0;         
+    background: #000;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    margin-top: 16px;
+    transition: background 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.publish-btn:hover {
+    background: #333;
+    transform: translateY(-1px);
 }
