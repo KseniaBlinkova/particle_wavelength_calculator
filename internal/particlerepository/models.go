@@ -23,7 +23,6 @@ type Particle struct {
 	VideoKey        string `gorm:"column:video_key;size:255"`
 	Mass            float64
 	Spin            string `gorm:"size:10"`
-	Wavelength      float64
 	CreatedAt       time.Time
 	CreatorID       uint
 	Creator         User `gorm:"foreignKey:CreatorID"`

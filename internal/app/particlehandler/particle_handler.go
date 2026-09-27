@@ -18,9 +18,10 @@ import (
 var particleTemplates = template.Must(template.ParseFS(particleassets.ParticleFiles, "resources/templates/*.html"))
 
 const (
-	ParticleMediaBaseURL = "http://localhost:9000/de-broglie/"
-	DefaultImageKey      = "default.jpg" // ← ключ в MinIO
-	DefaultVideoKey      = "default.mp4" // ← ключ в MinIO
+	MinioMediaBaseURL = "http://localhost:9000/de-broglie/"
+	LocalMediaBaseURL = "/static/media/"
+	DefaultImageKey   = "default.jpg"
+	DefaultVideoKey   = "default.mp4"
 )
 
 func NewParticleMux() *http.ServeMux {
@@ -61,13 +62,13 @@ func renderParticleTemplate(w http.ResponseWriter, particleTemplateName string, 
 	}
 }
 
-// mediaURL — возвращает полный URL файла из MinIO.
-// Если ключ пустой — возвращает URL файла по умолчанию (тоже из MinIO).
-func mediaURL(key, baseURL, defaultKey string) string {
+// mediaURL — если у частицы задан ключ, берёт файл из MinIO,
+// иначе возвращает дефолтный файл из локальной папки resources/static/media.
+func mediaURL(key, defaultKey string) string {
 	if key == "" {
-		return baseURL + defaultKey
+		return LocalMediaBaseURL + defaultKey
 	}
-	return baseURL + key
+	return MinioMediaBaseURL + key
 }
 
 // GET /feed
@@ -131,8 +132,8 @@ func ParticleFeedHandler(w http.ResponseWriter, r *http.Request) {
 		HasNext    bool
 	}{
 		Particle:   *particle,
-		ImageURL:   mediaURL(particle.ImageKey, ParticleMediaBaseURL, DefaultImageKey),
-		VideoURL:   mediaURL(particle.VideoKey, ParticleMediaBaseURL, DefaultVideoKey),
+		ImageURL:   mediaURL(particle.ImageKey, DefaultImageKey),
+		VideoURL:   mediaURL(particle.VideoKey, DefaultVideoKey),
 		LikesCount: particlerepository.GetParticleLikesCount(particle.ID),
 		HasNext:    hasNext,
 	}
@@ -151,15 +152,15 @@ func ParticleDraftHandler(w http.ResponseWriter, r *http.Request) {
 		VideoURL string
 		HasDraft bool
 	}{
-		ImageURL: ParticleMediaBaseURL + DefaultImageKey,
-		VideoURL: ParticleMediaBaseURL + DefaultVideoKey,
+		ImageURL: LocalMediaBaseURL + DefaultImageKey,
+		VideoURL: LocalMediaBaseURL + DefaultVideoKey,
 		HasDraft: particle != nil,
 	}
 
 	if particle != nil {
 		particleDraftData.Particle = *particle
-		particleDraftData.ImageURL = mediaURL(particle.ImageKey, ParticleMediaBaseURL, DefaultImageKey)
-		particleDraftData.VideoURL = mediaURL(particle.VideoKey, ParticleMediaBaseURL, DefaultVideoKey)
+		particleDraftData.ImageURL = mediaURL(particle.ImageKey, DefaultImageKey)
+		particleDraftData.VideoURL = mediaURL(particle.VideoKey, DefaultVideoKey)
 	}
 
 	renderParticleTemplate(w, "particle_draft.html", particleDraftData)
@@ -170,10 +171,10 @@ func ParticleDraftHandler(w http.ResponseWriter, r *http.Request) {
 func ParticleCardsHandler(w http.ResponseWriter, r *http.Request) {
 	const filterSteps = 100
 
-	filterPosition := 0
+	filterPosition := 1
 	if filter := r.URL.Query().Get("filter"); filter != "" {
 		position, err := strconv.Atoi(filter)
-		if err != nil || position < 0 || position > filterSteps {
+		if err != nil || position < 1 || position > filterSteps {
 			http.Error(w, "Некорректное положение ползунка", http.StatusBadRequest)
 			return
 		}
@@ -183,9 +184,9 @@ func ParticleCardsHandler(w http.ResponseWriter, r *http.Request) {
 	published := particlerepository.GetPublishedParticles()
 	minAvailableMass, maxAvailableMass := particleMassRange(published)
 	particles := published
-	filterLabel := "0 кг"
+	filterLabel := "—"
 
-	if filterPosition > 0 && minAvailableMass > 0 && maxAvailableMass >= minAvailableMass {
+	if minAvailableMass > 0 && maxAvailableMass >= minAvailableMass {
 		fraction := float64(filterPosition-1) / float64(filterSteps-1)
 		minMass := minAvailableMass * math.Pow(maxAvailableMass/minAvailableMass, fraction)
 		particles = particlerepository.FilterParticlesByMass(minMass)
@@ -205,7 +206,7 @@ func ParticleCardsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, p := range particles {
 		particleCards = append(particleCards, ParticleCardData{
 			Particle:   p,
-			ImageURL:   mediaURL(p.ImageKey, ParticleMediaBaseURL, DefaultImageKey),
+			ImageURL:   mediaURL(p.ImageKey, DefaultImageKey),
 			LikesCount: particlerepository.GetParticleLikesCount(p.ID),
 		})
 	}
@@ -272,15 +273,13 @@ func ParticleCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	mass, _ := strconv.ParseFloat(r.FormValue("mass"), 64)
 	spin := r.FormValue("spin")
-	wavelength, _ := strconv.ParseFloat(r.FormValue("wavelength"), 64)
 
 	particle := &particlerepository.Particle{
-		Name:       name,
-		Mass:       mass,
-		Spin:       spin,
-		Wavelength: wavelength,
-		Status:     particlerepository.StatusDraft,
-		CreatorID:  1,
+		Name:      name,
+		Mass:      mass,
+		Spin:      spin,
+		Status:    particlerepository.StatusDraft,
+		CreatorID: 1,
 	}
 
 	if err := particlerepository.CreateParticle(particle); err != nil {
@@ -307,13 +306,11 @@ func ParticlePublishHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mass, _ := strconv.ParseFloat(r.FormValue("mass"), 64)
-	wavelength, _ := strconv.ParseFloat(r.FormValue("wavelength"), 64)
 
 	updates := map[string]interface{}{
 		"name":             r.FormValue("name"),
 		"mass":             mass,
 		"spin":             r.FormValue("spin"),
-		"wavelength":       wavelength,
 		"full_description": r.FormValue("full_description"),
 		"status":           particlerepository.StatusPublished,
 	}

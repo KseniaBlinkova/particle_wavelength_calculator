@@ -23,14 +23,14 @@
                                    id="mass-filter"
                                    name="filter"
                                    class="filter-input"
-                                   min="0"
+                                   min="1"
                                    max="{{.FilterSteps}}"
                                    step="1"
                                    value="{{.Filter}}"
                                    data-min-mass="{{.MinMass}}"
                                    data-max-mass="{{.MaxMass}}">
                             <div class="filter-scale">
-                                <span>0 кг</span>
+                                <span>{{printf "%.1e" .MinMass}} кг</span>
                                 <output id="mass-output" for="mass-filter">{{.FilterLabel}}</output>
                                 <span>{{printf "%.1e" .MaxMass}} кг</span>
                             </div>
@@ -62,7 +62,7 @@
                     <!-- КНОПКА УДАЛЕНИЯ (POST-запрос на /delete) -->
                     <form method="POST" action="/delete" class="delete-form">
                         <input type="hidden" name="id" value="{{.Particle.ID}}">
-                        <button type="submit" class="btn-delete" title="Удалить">✕</button>
+                        <button type="submit" class="btn-delete">Удалить</button>
                     </form>
                 </div>
                 {{end}}
@@ -94,12 +94,11 @@
             const steps = Number(slider.max);
 
             slider.addEventListener('input', () => {
-                const position = Number(slider.value);
-                if (position === 0) {
-                    output.textContent = '0 кг';
+                if (!(minMass > 0) || !(maxMass >= minMass)) {
+                    output.textContent = '—';
                     return;
                 }
-                const fraction = (position - 1) / (steps - 1);
+                const fraction = (Number(slider.value) - 1) / (steps - 1);
                 const mass = minMass * Math.pow(maxMass / minMass, fraction);
                 output.textContent = `${mass.toExponential(3)} кг`;
             });

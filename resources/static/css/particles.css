@@ -312,14 +312,15 @@ body {
 
 .media-fields {
     display: flex;
-    justify-content: center;  /* ← ЦЕНТРИРУЕМ КАРТОЧКИ */
+    flex-direction: column;   /* ← ФОТО НАД ВИДЕО */
+    align-items: center;
     gap: 12px;
     margin-bottom: 20px;
     width: 100%;
 }
 
 .media-box {
-    width: 172px;
+    width: 260px;
     height: 144px;
     background: #F8F9FA;
     border-radius: 12px;
@@ -522,7 +523,7 @@ body {
     overflow: visible;
     display: grid;
     grid-template-columns: repeat(2, 169px);
-    grid-auto-rows: 240px;
+    grid-auto-rows: auto;
     align-content: start;
     align-items: start;
     gap: 16px;
@@ -530,22 +531,11 @@ body {
 }
 
 .card-item {
-    width: 169px;
-    height: 240px;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    background: #fff;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-card);
-    overflow: hidden;
     text-decoration: none;
     color: inherit;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.02);
-    transition: transform .2s ease, box-shadow .2s ease;
-}
-.card-item:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.10);
 }
 
 .card-image {
@@ -598,34 +588,44 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.02);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.card-wrapper:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.10);
 }
 
 .delete-form {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 10;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 0 12px 12px;
 }
 
 .btn-delete {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(255, 99, 99, 0.9);
+    min-width: 96px;
+    height: 32px;
+    padding: 0 16px;
+    background: var(--color-like);
     color: #fff;
     border: none;
-    font-size: 14px;
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, transform 0.2s;
+    transition: background .2s ease, transform .2s ease;
 }
 
 .btn-delete:hover {
-    background: #FF6363;
-    transform: scale(1.1);
+    background: #E24C4C;
+    transform: translateY(-1px);
 }
 
 .save-btn {

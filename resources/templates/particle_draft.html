@@ -13,27 +13,12 @@
             <div class="draft-header">РАСЧЕТ ДЛИНЫ ВОЛНЫ ДЕ БРОЙЛЯ ДЛЯ ЧАСТИЦ</div>
             <h1 class="draft-title">Добавить</h1>
 
-            <div class="media-fields">
-                <div class="media-box">
-                    <img src="{{.ImageURL}}" alt="Изображение">
-                    <span class="media-label">Изображение</span>
-                </div>
-                <div class="media-box">
-                    <video src="{{.VideoURL}}" muted autoplay loop playsinline></video>
-                    <span class="media-label">Видео</span>
-                </div>
-            </div>
-
             {{if .HasDraft}}
             <form method="POST" action="/publish" class="draft-form">
                 <input type="hidden" name="id" value="{{.Particle.ID}}">
+                <input type="hidden" name="name" value="{{.Particle.Name}}">
 
                 <div class="text-fields">
-                    <div class="field">
-                        <label for="name">Название</label>
-                        <input id="name" name="name" type="text" value="{{.Particle.Name}}" required>
-                    </div>
-
                     <div class="field">
                         <label for="mass">Масса частицы (кг)</label>
                         <input id="mass" name="mass" type="number" min="0" step="any" value="{{.Particle.Mass}}">
@@ -42,11 +27,6 @@
                     <div class="field">
                         <label for="spin">Спин</label>
                         <input id="spin" name="spin" type="text" value="{{.Particle.Spin}}">
-                    </div>
-
-                    <div class="field">
-                        <label for="wavelength">Длина волны де Бройля (м)</label>
-                        <input id="wavelength" name="wavelength" type="number" min="0" step="any" value="{{.Particle.Wavelength}}">
                     </div>
 
                     <div class="field">
@@ -65,25 +45,21 @@
 
             {{else}}
             <form method="POST" action="/draft" class="draft-form">
+                <div class="media-fields">
+                    <div class="media-box">
+                        <img src="{{.ImageURL}}" alt="Фото">
+                        <span class="media-label">Фото</span>
+                    </div>
+                    <div class="media-box">
+                        <video src="{{.VideoURL}}" muted autoplay loop playsinline></video>
+                        <span class="media-label">Видео</span>
+                    </div>
+                </div>
+
                 <div class="text-fields">
                     <div class="field">
                         <label for="name">Название</label>
                         <input id="name" name="name" type="text" placeholder="Введите название" required>
-                    </div>
-
-                    <div class="field">
-                        <label for="mass">Масса частицы (кг)</label>
-                        <input id="mass" name="mass" type="number" min="0" step="any" placeholder="Например, 9.11e-31">
-                    </div>
-
-                    <div class="field">
-                        <label for="spin">Спин</label>
-                        <input id="spin" name="spin" type="text" placeholder="Например, 1/2">
-                    </div>
-
-                    <div class="field">
-                        <label for="wavelength">Длина волны де Бройля (м)</label>
-                        <input id="wavelength" name="wavelength" type="number" min="0" step="any" placeholder="Например, 3.32e-10">
                     </div>
                 </div>
 
