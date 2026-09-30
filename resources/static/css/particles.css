@@ -319,6 +319,10 @@ body {
     width: 100%;
 }
 
+.media-fields-readonly .media-box {
+    pointer-events: none;
+}
+
 .media-box {
     width: 260px;
     height: 144px;

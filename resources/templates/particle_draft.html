@@ -16,9 +16,24 @@
             {{if .HasDraft}}
             <form method="POST" action="/publish" class="draft-form">
                 <input type="hidden" name="id" value="{{.Particle.ID}}">
-                <input type="hidden" name="name" value="{{.Particle.Name}}">
+
+                <div class="media-fields media-fields-readonly" aria-label="Добавленные медиафайлы">
+                    <div class="media-box">
+                        <img src="{{.ImageURL}}" alt="Фото">
+                        <span class="media-label">Фото</span>
+                    </div>
+                    <div class="media-box">
+                        <video src="{{.VideoURL}}" muted autoplay loop playsinline></video>
+                        <span class="media-label">Видео</span>
+                    </div>
+                </div>
 
                 <div class="text-fields">
+                    <div class="field">
+                        <label for="name">Название</label>
+                        <input id="name" name="name" type="text" value="{{.Particle.Name}}" readonly>
+                    </div>
+
                     <div class="field">
                         <label for="mass">Масса частицы (кг)</label>
                         <input id="mass" name="mass" type="number" min="0" step="any" value="{{.Particle.Mass}}">
@@ -34,10 +49,6 @@
                         <textarea id="full_description" name="full_description" placeholder="Введите полное описание...">{{.Particle.FullDescription}}</textarea>
                     </div>
 
-                    <div class="field">
-                        <label for="status">Статус</label>
-                        <input id="status" type="text" value="Черновик" class="white-input" readonly>
-                    </div>
                 </div>
 
                 <button type="submit" class="publish-btn">Опубликовать</button>
