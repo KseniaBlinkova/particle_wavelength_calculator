@@ -1,0 +1,30 @@
+package user
+
+import (
+	"context"
+
+	"particleapp/internal/models"
+)
+
+// Repository — порт хранения пользователей (реализация — internal/storage/postgres).
+type Repository interface {
+	CreateUser(ctx context.Context, user *models.User) error
+	GetUserByID(ctx context.Context, id uint) (*models.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+}
+
+// Domain — бизнес-логика домена «пользователь»:
+// POST /api/users, POST /api/users/login, POST /api/users/logout.
+type Domain interface {
+	Register(ctx context.Context, request RegisterRequest) (*UserResponse, error)
+	Login(ctx context.Context, request LoginRequest) (*LoginResponse, error)
+	Logout(ctx context.Context) error
+}
+
+type Usecase struct {
+	repo Repository
+}
+
+func New(repo Repository) *Usecase {
+	return &Usecase{repo: repo}
+}
