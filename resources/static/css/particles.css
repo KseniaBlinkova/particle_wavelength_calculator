@@ -616,7 +616,7 @@ body {
     min-width: 96px;
     height: 32px;
     padding: 0 16px;
-    background: var(--color-like);
+    background: var(--color-text);
     color: #fff;
     border: none;
     border-radius: var(--radius-field);
@@ -628,7 +628,7 @@ body {
 }
 
 .btn-delete:hover {
-    background: #E24C4C;
+    background: #333;
     transform: translateY(-1px);
 }
 
