@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +18,6 @@ const (
 	maxUsernameLength = 50
 	minPasswordLength = 6
 	maxPasswordLength = 72
-	stubTokenPrefix   = "lab4-stub-token-"
 )
 
 // Register — POST /api/users. Проверяет занятость email, хеширует пароль
@@ -61,26 +59,44 @@ func (u *Usecase) Register(ctx context.Context, request RegisterRequest) (*UserR
 	return &response, nil
 }
 
-// Login — POST /api/users/login. Заглушка лабораторной работы 3:
-// настоящая аутентификация, выдача и проверка токена — в лабораторной 4,
-// поэтому учётные данные из тела запроса не проверяются, а пользователь
-// берётся из функции-singleton.
+// Login — POST /api/users/login. Проверяет пароль и выдаёт подписанный JWT.
 func (u *Usecase) Login(ctx context.Context, request LoginRequest) (*LoginResponse, error) {
-	currentUserID := auth.Get().ID
+	email := strings.ToLower(strings.TrimSpace(request.Email))
+	if err := validateEmail(email); err != nil {
+		return nil, apperror.Unauthorized("Неверный email или пароль")
+	}
 
-	found, err := u.repo.GetUserByID(ctx, currentUserID)
+	found, err := u.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, apperror.Internal("Не удалось получить текущего пользователя")
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, apperror.Unauthorized("Неверный email или пароль")
+		}
+		return nil, apperror.Internal("Не удалось выполнить вход")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(found.PasswordHash), []byte(request.Password)); err != nil {
+		return nil, apperror.Unauthorized("Неверный email или пароль")
+	}
+
+	token, err := u.tokens.Issue(found.ID)
+	if err != nil {
+		return nil, apperror.Internal("Не удалось выпустить токен")
 	}
 
 	return &LoginResponse{
-		Token: stubTokenPrefix + strconv.FormatUint(uint64(currentUserID), 10),
+		Token: token,
 		User:  newUserResponse(*found),
 	}, nil
 }
 
-// Logout — POST /api/users/logout. Заглушка: сессии появятся в лабораторной 4.
+// Logout — POST /api/users/logout. Отзывает текущий JWT через Redis blacklist.
 func (u *Usecase) Logout(ctx context.Context) error {
+	claims, ok := auth.ClaimsFromContext(ctx)
+	if !ok {
+		return apperror.Unauthorized("Требуется авторизация")
+	}
+	if err := u.tokens.Revoke(ctx, claims); err != nil {
+		return apperror.Internal("Не удалось завершить сеанс")
+	}
 	return nil
 }
 

@@ -26,6 +26,10 @@ func PayloadTooLarge(code, message string) *Error {
 	return New(http.StatusRequestEntityTooLarge, code, message)
 }
 
+func Unauthorized(message string) *Error {
+	return New(http.StatusUnauthorized, "unauthorized", message)
+}
+
 func Forbidden(message string) *Error {
 	return New(http.StatusForbidden, "forbidden", message)
 }

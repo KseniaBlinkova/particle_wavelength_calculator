@@ -1,0 +1,237 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Particle Wavelength Calculator API",
+    "version": "4.0.0",
+    "description": "REST API лабораторной работы №4. Чтение списка и ленты публичное; методы создателя требуют JWT."
+  },
+  "servers": [{"url": "/api"}],
+  "tags": [
+    {"name": "Authentication", "description": "Регистрация, вход и отзыв JWT"},
+    {"name": "Particles", "description": "Услуги/частицы и бизнес-процесс"},
+    {"name": "System", "description": "Проверка зависимостей"}
+  ],
+  "paths": {
+    "/users": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Зарегистрировать пользователя",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegisterRequest"}}}},
+        "responses": {
+          "201": {"description": "Пользователь создан", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}},
+          "400": {"description": "Некорректные данные"},
+          "409": {"description": "Email уже занят"}
+        }
+      }
+    },
+    "/users/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Войти и получить JWT",
+        "description": "Скопируйте token из ответа, нажмите Authorize и вставьте его без префикса Bearer.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}},
+        "responses": {
+          "200": {"description": "Успешная аутентификация", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginResponse"}}}},
+          "401": {"description": "Неверный email или пароль"}
+        }
+      }
+    },
+    "/users/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Выйти и поместить JWT в Redis blacklist",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "204": {"description": "JWT отозван"},
+          "401": {"description": "Нет JWT или он недействителен"}
+        }
+      }
+    },
+    "/particles": {
+      "get": {
+        "tags": ["Particles"],
+        "summary": "Получить все опубликованные услуги",
+        "description": "Публичный метод, JWT не требуется.",
+        "parameters": [
+          {"name": "name", "in": "query", "schema": {"type": "string"}, "description": "Поиск по названию"},
+          {"name": "min_mass", "in": "query", "schema": {"type": "number", "minimum": 0}, "description": "Минимальная масса"}
+        ],
+        "responses": {"200": {"description": "Список услуг", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListResponse"}}}}}
+      },
+      "post": {
+        "tags": ["Particles"],
+        "summary": "Создать черновик с картинкой и видео",
+        "description": "creator_id автоматически берётся из JWT.",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "image", "video"],
+                "properties": {
+                  "name": {"type": "string", "maxLength": 100},
+                  "mass": {"type": "number", "minimum": 0},
+                  "spin": {"type": "string", "maxLength": 10},
+                  "full_description": {"type": "string"},
+                  "image": {"type": "string", "format": "binary"},
+                  "video": {"type": "string", "format": "binary"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Черновик создан", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Particle"}}}},
+          "401": {"description": "Требуется JWT"},
+          "409": {"description": "У пользователя уже есть черновик"}
+        }
+      }
+    },
+    "/particles/draft": {
+      "get": {
+        "tags": ["Particles"],
+        "summary": "Получить свой черновик",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "Черновик", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Particle"}}}},
+          "401": {"description": "Требуется JWT"},
+          "404": {"description": "Черновик не найден"}
+        }
+      }
+    },
+    "/particles/feed": {
+      "get": {
+        "tags": ["Particles"],
+        "summary": "Получить элемент ленты",
+        "description": "Без id возвращает первый элемент. С id и next=true возвращает следующий. Публичный метод.",
+        "parameters": [
+          {"name": "id", "in": "query", "schema": {"type": "integer", "format": "uint64", "minimum": 1}},
+          {"name": "next", "in": "query", "schema": {"type": "boolean", "default": false}}
+        ],
+        "responses": {
+          "200": {"description": "Элемент ленты", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedResponse"}}}},
+          "404": {"description": "Элемент не найден или лента закончилась"}
+        }
+      }
+    },
+    "/particles/{id}/publish": {
+      "put": {
+        "tags": ["Particles"],
+        "summary": "Опубликовать свой черновик и обновить поля",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ParticleID"}],
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishRequest"}}}},
+        "responses": {
+          "200": {"description": "Опубликованная услуга", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Particle"}}}},
+          "401": {"description": "Требуется JWT"},
+          "403": {"description": "Пользователь не владелец"},
+          "404": {"description": "Услуга не найдена"},
+          "409": {"description": "Некорректный статус"}
+        }
+      }
+    },
+    "/particles/{id}/like": {
+      "post": {
+        "tags": ["Particles"],
+        "summary": "Поставить или снять лайк",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ParticleID"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LikeRequest"}}}},
+        "responses": {
+          "200": {"description": "Состояние лайка", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LikeResponse"}}}},
+          "401": {"description": "Требуется JWT"},
+          "404": {"description": "Услуга не найдена"}
+        }
+      }
+    },
+    "/particles/{id}": {
+      "delete": {
+        "tags": ["Particles"],
+        "summary": "Логически удалить свою услугу",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ParticleID"}],
+        "responses": {
+          "204": {"description": "Услуга удалена"},
+          "401": {"description": "Требуется JWT"},
+          "403": {"description": "Пользователь не владелец"},
+          "404": {"description": "Услуга не найдена"}
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Проверить PostgreSQL, MinIO и Redis",
+        "responses": {"200": {"description": "Все зависимости доступны"}, "503": {"description": "Зависимость недоступна"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "ParticleID": {"name": "id", "in": "path", "required": true, "schema": {"type": "integer", "format": "uint64", "minimum": 1}}
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object", "required": ["username", "email", "password"],
+        "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 50}, "email": {"type": "string", "format": "email"}, "password": {"type": "string", "format": "password", "minLength": 6, "maxLength": 72}}
+      },
+      "LoginRequest": {
+        "type": "object", "required": ["email", "password"],
+        "properties": {"email": {"type": "string", "format": "email"}, "password": {"type": "string", "format": "password"}}
+      },
+      "User": {
+        "type": "object", "required": ["id", "username", "email"],
+        "properties": {"id": {"type": "integer", "format": "uint64"}, "username": {"type": "string"}, "email": {"type": "string", "format": "email"}}
+      },
+      "LoginResponse": {
+        "type": "object", "required": ["token", "user"],
+        "properties": {"token": {"type": "string", "description": "JWT для Bearer Authorization"}, "user": {"$ref": "#/components/schemas/User"}}
+      },
+      "Particle": {
+        "type": "object",
+        "required": ["id", "name", "full_description", "spin", "image_url", "video_url", "likes_count", "is_liked", "created_at"],
+        "properties": {
+          "id": {"type": "integer", "format": "uint64"},
+          "name": {"type": "string"},
+          "full_description": {"type": "string"},
+          "mass": {"type": "number", "format": "double", "nullable": true},
+          "spin": {"type": "string"},
+          "image_url": {"type": "string", "format": "uri"},
+          "video_url": {"type": "string", "format": "uri"},
+          "likes_count": {"type": "integer"},
+          "is_liked": {"type": "integer", "enum": [0, 1]},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "MassRange": {
+        "type": "object",
+        "properties": {"min": {"type": "number", "format": "double", "nullable": true}, "max": {"type": "number", "format": "double", "nullable": true}}
+      },
+      "ListResponse": {
+        "type": "object", "required": ["items", "count", "mass_range"],
+        "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Particle"}}, "count": {"type": "integer"}, "mass_range": {"$ref": "#/components/schemas/MassRange"}}
+      },
+      "FeedResponse": {
+        "type": "object", "required": ["particle"],
+        "properties": {"particle": {"$ref": "#/components/schemas/Particle"}}
+      },
+      "PublishRequest": {
+        "type": "object",
+        "properties": {"mass": {"type": "number", "minimum": 0}, "spin": {"type": "string", "maxLength": 10}, "full_description": {"type": "string"}}
+      },
+      "LikeRequest": {
+        "type": "object", "required": ["liked"],
+        "properties": {"liked": {"type": "integer", "enum": [0, 1]}}
+      },
+      "LikeResponse": {
+        "type": "object", "required": ["particle_id", "liked", "likes_count"],
+        "properties": {"particle_id": {"type": "integer", "format": "uint64"}, "liked": {"type": "integer", "enum": [0, 1]}, "likes_count": {"type": "integer"}}
+      }
+    }
+  }
+}

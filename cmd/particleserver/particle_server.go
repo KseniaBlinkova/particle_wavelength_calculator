@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -29,14 +30,24 @@ func main() {
 	}
 	log.Printf("MinIO: бакет %s доступен", files.Bucket())
 
+	authContext, cancelAuth := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelAuth()
+	tokens, err := auth.New(authContext, cfg.Auth)
+	if err != nil {
+		log.Fatal("Ошибка подключения к Redis: ", err)
+	}
+	defer tokens.Close()
+	log.Printf("Redis: %s доступен", cfg.Auth.RedisAddr)
+
 	particleUsecase := particle.New(store, files)
-	userUsecase := user.New(store)
+	userUsecase := user.New(store, tokens)
 
 	router := httpapi.NewRouter(httpapi.Dependencies{
 		Particles: particleUsecase,
 		Users:     userUsecase,
 		Store:     store,
 		Files:     files,
+		Auth:      tokens,
 	})
 
 	server := &http.Server{
@@ -48,9 +59,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	currentUserID := auth.Get().ID
-	log.Printf("Текущий пользователь (константа): #%d", currentUserID)
-
 	log.Printf("Веб-сервис API: http://localhost%s/api", cfg.HTTPAddr)
+	log.Printf("Swagger UI: http://localhost%s/swagger/index.html", cfg.HTTPAddr)
 	log.Fatal(server.ListenAndServe())
 }

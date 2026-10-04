@@ -1,15 +1,19 @@
 package httpapi
 
 import (
+	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"particleapp/internal/apperror"
+	"particleapp/internal/auth"
 	"particleapp/internal/domain/particle"
 	"particleapp/internal/domain/user"
 	"particleapp/internal/filestorage"
 	"particleapp/internal/storage/postgres"
+	"particleapp/internal/swagger"
 	"particleapp/internal/web"
 )
 
@@ -18,6 +22,7 @@ type Dependencies struct {
 	Users     user.Domain
 	Store     *postgres.Store
 	Files     *filestorage.MinIO
+	Auth      *auth.Manager
 }
 
 // NewRouter отдаёт только REST API. HTML-шаблонов и server-rendered маршрутов
@@ -32,7 +37,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	})
 
 	mux := http.NewServeMux()
-	mux.Handle("/api/", middleware(api))
+	mux.Handle("/api/", middleware(api, deps.Auth))
+	swagger.Register(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	})
@@ -45,17 +51,80 @@ func health(deps Dependencies) http.HandlerFunc {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		if err := deps.Auth.Ping(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 
 		payload := map[string]string{
 			"api":    "/api",
 			"bucket": deps.Files.Bucket(),
+			"redis":  "ok",
 		}
 		web.WriteJSON(w, http.StatusOK, payload)
 	}
 }
 
-func middleware(next http.Handler) http.Handler {
-	return recoverPanic(logRequests(withCORS(next)))
+func middleware(next http.Handler, tokens *auth.Manager) http.Handler {
+	secured := authenticate(tokens, authorize(next))
+	return recoverPanic(logRequests(withCORS(secured)))
+}
+
+func authenticate(tokens *auth.Manager, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := strings.TrimSpace(r.Header.Get("Authorization"))
+		if header == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		parts := strings.Fields(header)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+			web.WriteError(w, apperror.Unauthorized("Ожидается заголовок Authorization: Bearer <token>"))
+			return
+		}
+
+		claims, err := tokens.Parse(r.Context(), parts[1])
+		if err != nil {
+			if errors.Is(err, auth.ErrInvalidToken) {
+				web.WriteError(w, apperror.Unauthorized("JWT недействителен или отозван"))
+			} else {
+				web.WriteError(w, apperror.Internal("Не удалось проверить JWT"))
+			}
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(auth.WithClaims(r.Context(), claims)))
+	})
+}
+
+func authorize(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if publicRoute(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if _, ok := auth.UserID(r.Context()); !ok {
+			web.WriteError(w, apperror.Unauthorized("Требуется авторизация"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func publicRoute(r *http.Request) bool {
+	if r.Method == http.MethodPost && (r.URL.Path == "/api/users" || r.URL.Path == "/api/users/login") {
+		return true
+	}
+	if r.Method != http.MethodGet {
+		return false
+	}
+	switch r.URL.Path {
+	case "/api/health", "/api/particles", "/api/particles/feed":
+		return true
+	default:
+		return false
+	}
 }
 
 func withCORS(next http.Handler) http.Handler {

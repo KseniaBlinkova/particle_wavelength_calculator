@@ -1,15 +1,14 @@
-# Лабораторная работа №3 — веб-сервис частиц
+# Лабораторная работа №4 — JWT, Redis и Swagger
 
 Backend для каталога частиц. Сервис хранит данные в PostgreSQL через ORM
-GORM, изображения и короткие видео — в MinIO. Настоящей авторизации в этой
-лабораторной нет: во всех операциях используется фиксированный пользователь
-`id=1`, получаемый через функцию-singleton `auth.Get()`.
+GORM, изображения и короткие видео — в MinIO, а отозванные JWT — в Redis.
+Swagger UI описывает все методы и поддерживает Bearer-аутентификацию.
 
 ## Быстрый запуск
 
 Требования: Docker Desktop и Go 1.27 или новее.
 
-1. Запустить PostgreSQL, MinIO и Adminer:
+1. Запустить PostgreSQL, MinIO, Redis и Adminer:
 
    ```bash
    docker compose up -d
@@ -22,7 +21,9 @@ GORM, изображения и короткие видео — в MinIO. Нас
    go run ./cmd/particleserver
    ```
 
-3. Проверить сервис:
+3. Открыть Swagger UI: `http://localhost:8081/swagger/index.html`.
+
+4. Проверить сервис:
 
    ```bash
    curl http://localhost:8081/api/health
@@ -31,14 +32,16 @@ GORM, изображения и короткие видео — в MinIO. Нас
    Ожидаемый ответ:
 
    ```json
-   {"api":"/api","bucket":"de-broglie"}
+   {"api":"/api","bucket":"de-broglie","redis":"ok"}
    ```
 
 После запуска доступны:
 
 - API: `http://localhost:8081/api`;
+- Swagger UI: `http://localhost:8081/swagger/index.html`;
 - MinIO API и публичные файлы: `http://localhost:9010`;
 - консоль MinIO: `http://localhost:9011` (`minioadmin` / `minioadmin`);
+- Redis: `localhost:6380`, контейнер `particle_redis`;
 - Adminer: `http://localhost:8090`.
 
 Проект является только REST backend: HTML-шаблонов и server-rendered страниц в
@@ -51,7 +54,8 @@ PostgreSQL не из Docker используйте `localhost:5433`.
 Настройки по умолчанию находятся в `internal/config/config.go`. Их можно
 переопределить переменными `HTTP_ADDR`, `DATABASE_DSN`, `MINIO_ENDPOINT`,
 `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_USE_SSL` и
-`MINIO_PUBLIC_URL`.
+`MINIO_PUBLIC_URL`, `JWT_SECRET`, `JWT_TTL`, `REDIS_ADDR`, `REDIS_PASSWORD` и
+`REDIS_DB`.
 
 По умолчанию backend использует MinIO из `docker-compose.yml` на портах
 `9010/9011`. Если нужно подключить другой экземпляр MinIO, endpoint можно
@@ -63,17 +67,37 @@ MINIO_ENDPOINT=localhost:9000 go run ./cmd/particleserver
 
 При запуске сервер выполняет GORM `AutoMigrate`, поэтому таблицы, внешние ключи
 и уникальные индексы создаются при подключении к пустой базе автоматически.
-Пользователь `id=1` также гарантированно создаётся сервером.
+Пользователи создаются через метод регистрации.
 
-> `docker compose down -v` удаляет контейнеры вместе со всеми данными PostgreSQL
-> и MinIO. Используйте эту команду только когда действительно нужна чистая база.
+> `docker compose down -v` удаляет контейнеры вместе со всеми данными PostgreSQL,
+> MinIO и Redis. Используйте эту команду только когда действительно нужна чистая база.
 
 ## HTTP API
 
 Успешные ответы API имеют формат JSON, кроме удаления и выхода с кодом
 `204 No Content`. При ошибке сервис возвращает только стандартный HTTP-код
-(`400`, `403`, `404`, `409`, `413`, `415` или `500`) с пустым телом. Код ответа
+(`400`, `401`, `403`, `404`, `409`, `413`, `415` или `500`) с пустым телом. Код ответа
 не дублируется внутри JSON.
+
+### Аутентификация и доступ
+
+Регистрация сохраняет bcrypt-хеш пароля. Вход проверяет email и пароль и
+возвращает JWT со сроком действия один час. Токен передаётся так:
+
+```http
+Authorization: Bearer <token>
+```
+
+При создании услуги `creator_id` автоматически берётся из проверенного JWT.
+После logout идентификатор токена `jti` хранится в Redis blacklist до окончания
+его срока действия; повторное использование токена возвращает `401`.
+
+Публичны регистрация, вход, health, список и лента. Для черновика, создания,
+публикации, удаления, лайка и logout нужен JWT. Изменять или удалять услугу
+может только её создатель; попытка другого пользователя возвращает `403`.
+
+В Swagger скопируйте `token` из ответа login, нажмите **Authorize** и вставьте
+значение без слова `Bearer`.
 
 ### Домен «услуга/частица»
 
@@ -106,14 +130,26 @@ MINIO_ENDPOINT=localhost:9000 go run ./cmd/particleserver
 ### Домен «пользователь»
 
 - `POST /api/users` — регистрирует пользователя по `username`, `email`, `password`;
-- `POST /api/users/login` — заглушка входа; принимает `email`, `password`
-- `POST /api/users/logout` — заглушка выхода; возвращает `204 No Content`.
+- `POST /api/users/login` — проверяет пароль и возвращает JWT;
+- `POST /api/users/logout` — отзывает JWT через Redis blacklist и возвращает `204 No Content`.
 
 
-- `GET /api/health` — проверяет PostgreSQL и возвращает имя бакета MinIO.
+- `GET /api/health` — проверяет PostgreSQL и Redis, возвращает имя бакета MinIO.
 
-Системные поля `id`, `status`, `creator_id`, `created_at`,
-`formed_at` и `completed_at` не принимаются из запросов на изменение. Они
+После logout содержимое blacklist можно показать командами:
+
+```bash
+docker exec -it particle_redis redis-cli
+KEYS jwt:blacklist:*
+GET jwt:blacklist:<jti>
+TTL jwt:blacklist:<jti>
+```
+
+Значение ключа содержит `user_id`, а TTL совпадает с оставшимся временем жизни
+JWT.
+
+Системные поля `id`, `status`, `creator_id`, `created_at` и `completed_at`
+не принимаются из запросов на изменение. Они
 вычисляются бизнес-логикой backend. Удалённые записи не возвращаются списком и
 не попадают в ленту.
 
@@ -146,7 +182,6 @@ MINIO_ENDPOINT=localhost:9000 go run ./cmd/particleserver
 - `wavelength` — `DOUBLE PRECISION`, длина волны предметной области.
 - `creator_id` — `INTEGER`, внешний ключ на `users.id`.
 - `created_at` — `TIMESTAMP`, дата создания.
-- `formed_at` — `TIMESTAMP`, дата публикации; допускает `NULL`.
 - `completed_at` — `TIMESTAMP`, дата логического удаления; допускает `NULL`.
 
 ### `likes`
@@ -171,8 +206,9 @@ internal/domain          HTTP-обработчики, DTO/сериализато
 internal/models          модели GORM и статусы
 internal/storage         PostgreSQL-репозитории
 internal/filestorage     работа с MinIO
-internal/auth            singleton текущего пользователя
-internal/httpapi         общий router и middleware
+internal/auth            JWT, контекст пользователя и Redis blacklist
+internal/httpapi         router, CORS, аутентификация и авторизация
+internal/swagger         OpenAPI 3 и Swagger UI
 resources/static/media   файлы-заглушки для первоначальной загрузки в MinIO
 ```
 
@@ -180,4 +216,8 @@ resources/static/media   файлы-заглушки для первоначал
 
 ```bash
 go vet ./...
+go test ./...
 ```
+
+Пошаговый план защиты, ТЗ, сообщения sequence-диаграммы и ответы на контрольные
+вопросы находятся в `docs/lab4-defense.md`.

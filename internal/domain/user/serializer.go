@@ -16,13 +16,13 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 }
 
-// LoginRequest — POST /api/users/login. В этой лаборатории запрос игнорируется.
+// LoginRequest — POST /api/users/login.
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// LoginResponse — ответ заглушки аутентификации.
+// LoginResponse — JWT и данные аутентифицированного пользователя.
 type LoginResponse struct {
 	Token string       `json:"token"`
 	User  UserResponse `json:"user"`

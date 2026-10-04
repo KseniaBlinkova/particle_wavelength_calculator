@@ -37,7 +37,7 @@ func register(domain Domain) http.HandlerFunc {
 	}
 }
 
-// login — POST /api/users/login (заглушка)
+// login — POST /api/users/login
 func login(domain Domain) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request LoginRequest
@@ -55,7 +55,7 @@ func login(domain Domain) http.HandlerFunc {
 	}
 }
 
-// logout — POST /api/users/logout (заглушка)
+// logout — POST /api/users/logout
 func logout(domain Domain) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := domain.Logout(r.Context()); err != nil {

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"particleapp/internal/auth"
 	"particleapp/internal/models"
 )
 
@@ -52,10 +50,6 @@ func New(dsn string) (*Store, error) {
 	if err := db.WithContext(ctx).AutoMigrate(&models.User{}, &models.Particle{}, &models.Like{}); err != nil {
 		return nil, fmt.Errorf("миграция схемы: %w", err)
 	}
-	if err := ensureCurrentUser(ctx, db); err != nil {
-		return nil, fmt.Errorf("создание пользователя лабораторной работы: %w", err)
-	}
-
 	return &Store{db: db}, nil
 }
 
@@ -95,41 +89,6 @@ func normalizeLegacyData(ctx context.Context, db *gorm.DB) error {
 	}
 
 	return nil
-}
-
-// ensureCurrentUser гарантирует, что singleton-пользователь существует даже
-// если база была создана только через GORM, без запуска SQL-миграции.
-func ensureCurrentUser(ctx context.Context, db *gorm.DB) error {
-	var current models.User
-	err := db.WithContext(ctx).First(&current, auth.CurrentUserID).Error
-	if err == nil {
-		return syncUserSequence(ctx, db)
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	current = models.User{
-		ID:       auth.CurrentUserID,
-		Username: "ksenia",
-		Email:    "ksenia@mail.ru",
-	}
-	if err := db.WithContext(ctx).Create(&current).Error; err != nil {
-		return err
-	}
-
-	// PostgreSQL не изменяет sequence после INSERT с явно заданным id.
-	return syncUserSequence(ctx, db)
-}
-
-func syncUserSequence(ctx context.Context, db *gorm.DB) error {
-	return db.WithContext(ctx).Exec(`
-		SELECT setval(
-			pg_get_serial_sequence('users', 'id'),
-			(SELECT MAX(id) FROM users),
-			true
-		)
-	`).Error
 }
 
 func (s *Store) Ping(ctx context.Context) error {

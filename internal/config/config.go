@@ -3,12 +3,17 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
+
+	"particleapp/internal/auth"
 )
 
 type Config struct {
 	HTTPAddr    string
 	DatabaseDSN string
 	MinIO       MinIOConfig
+	Auth        auth.Config
 }
 
 type MinIOConfig struct {
@@ -34,6 +39,13 @@ func Load() Config {
 	return Config{
 		HTTPAddr:    env("HTTP_ADDR", ":8081"),
 		DatabaseDSN: env("DATABASE_DSN", "host=localhost user=particle_user password=particle_pass dbname=particle_db port=5433 sslmode=disable"),
+		Auth: auth.Config{
+			Secret:        env("JWT_SECRET", "lab4-development-secret-change-me"),
+			TTL:           envDuration("JWT_TTL", time.Hour),
+			RedisAddr:     env("REDIS_ADDR", "localhost:6380"),
+			RedisPassword: env("REDIS_PASSWORD", ""),
+			RedisDB:       envInt("REDIS_DB", 0),
+		},
 		MinIO: MinIOConfig{
 			Endpoint:        minioEndpoint,
 			AccessKeyID:     env("MINIO_ACCESS_KEY", "minioadmin"),
@@ -43,6 +55,30 @@ func Load() Config {
 			PublicURL:       minioPublicURL,
 		},
 	}
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func env(key, fallback string) string {

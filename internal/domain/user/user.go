@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 
+	"particleapp/internal/auth"
 	"particleapp/internal/models"
 )
 
@@ -21,10 +22,16 @@ type Domain interface {
 	Logout(ctx context.Context) error
 }
 
-type Usecase struct {
-	repo Repository
+type Tokens interface {
+	Issue(userID uint) (string, error)
+	Revoke(ctx context.Context, claims *auth.Claims) error
 }
 
-func New(repo Repository) *Usecase {
-	return &Usecase{repo: repo}
+type Usecase struct {
+	repo   Repository
+	tokens Tokens
+}
+
+func New(repo Repository, tokens Tokens) *Usecase {
+	return &Usecase{repo: repo, tokens: tokens}
 }

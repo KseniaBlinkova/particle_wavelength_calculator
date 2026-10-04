@@ -79,23 +79,21 @@ func (u *Usecase) Feed(ctx context.Context, id *uint, next bool) (FeedResponse, 
 		}
 	}
 
-	hasNext, err := u.repo.GetNextPublished(ctx, particle.ID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return FeedResponse{}, apperror.Internal("Не удалось проверить продолжение ленты")
-	}
-
 	response, err := u.responses(ctx, []models.Particle{*particle})
 	if err != nil {
 		return FeedResponse{}, err
 	}
 
-	return FeedResponse{Particle: response[0], HasNext: hasNext != nil}, nil
+	return FeedResponse{Particle: response[0]}, nil
 }
 
 // Draft — GET /api/particles/draft. У пользователя не более одной записи
 // в статусе draft, идентификатор с клиента не передаётся.
 func (u *Usecase) Draft(ctx context.Context) (*ParticleResponse, error) {
-	creatorID := auth.Get().ID
+	creatorID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	draft, err := u.repo.GetDraftByCreator(ctx, creatorID)
 	if err != nil {
@@ -113,7 +111,10 @@ func (u *Usecase) Draft(ctx context.Context) (*ParticleResponse, error) {
 // а их имена сохраняются в полях image_key и video_key. Создатель,
 // статус и даты вычисляются на бэкенде.
 func (u *Usecase) Create(ctx context.Context, request CreateRequest) (*ParticleResponse, error) {
-	creatorID := auth.Get().ID
+	creatorID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	if _, err := u.repo.GetDraftByCreator(ctx, creatorID); err == nil {
 		return nil, apperror.Conflict(draftExistCode, "У пользователя уже есть черновик")
@@ -164,8 +165,8 @@ func (u *Usecase) Create(ctx context.Context, request CreateRequest) (*ParticleR
 	return &items[0], nil
 }
 
-// Publish — PUT /api/particles/{id}/publish. Смена статуса draft -> published
-// с проставлением даты формирования. Возврат в черновик не предусмотрен.
+// Publish — PUT /api/particles/{id}/publish. Смена статуса draft -> published.
+// Возврат в черновик не предусмотрен.
 func (u *Usecase) Publish(ctx context.Context, id uint, request PublishRequest) (*ParticleResponse, error) {
 	particle, err := u.ownedParticle(ctx, id)
 	if err != nil {
@@ -200,7 +201,7 @@ func (u *Usecase) Publish(ctx context.Context, id uint, request PublishRequest) 
 		return nil, apperror.Internal("Не удалось сохранить услугу")
 	}
 
-	updated, err := u.repo.UpdateStatus(ctx, particle.ID, auth.Get().ID, models.StatusDraft, models.StatusPublished, now)
+	updated, err := u.repo.UpdateStatus(ctx, particle.ID, particle.CreatorID, models.StatusDraft, models.StatusPublished, now)
 	if err != nil {
 		return nil, apperror.Internal("Не удалось опубликовать услугу")
 	}
@@ -247,6 +248,10 @@ func (u *Usecase) Delete(ctx context.Context, id uint) error {
 // Like — POST /api/particles/{id}/like. liked=1 ставит лайк от текущего
 // пользователя, liked=0 отменяет его.
 func (u *Usecase) Like(ctx context.Context, id uint, liked int) (LikeResponse, error) {
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return LikeResponse{}, err
+	}
 	if liked != 0 && liked != 1 {
 		return LikeResponse{}, apperror.Validation("Поле liked принимает только 0 или 1")
 	}
@@ -256,7 +261,7 @@ func (u *Usecase) Like(ctx context.Context, id uint, liked int) (LikeResponse, e
 		return LikeResponse{}, notFoundErr(err, "particle_not_found", "Услуга не найдена")
 	}
 
-	count, err := u.repo.SetLike(ctx, auth.Get().ID, particle.ID, liked == 1)
+	count, err := u.repo.SetLike(ctx, userID, particle.ID, liked == 1)
 	if err != nil {
 		return LikeResponse{}, apperror.Internal("Не удалось сохранить лайк")
 	}
@@ -265,7 +270,7 @@ func (u *Usecase) Like(ctx context.Context, id uint, liked int) (LikeResponse, e
 }
 
 func (u *Usecase) responses(ctx context.Context, particles []models.Particle) ([]ParticleResponse, error) {
-	viewerID := auth.Get().ID
+	viewerID, _ := auth.UserID(ctx)
 
 	ids := make([]uint, 0, len(particles))
 	for _, particle := range particles {
@@ -279,21 +284,33 @@ func (u *Usecase) responses(ctx context.Context, particles []models.Particle) ([
 
 	items := make([]ParticleResponse, 0, len(particles))
 	for _, particle := range particles {
-		items = append(items, newParticleResponse(particle, stats[particle.ID], u.files, viewerID))
+		items = append(items, newParticleResponse(particle, stats[particle.ID], u.files))
 	}
 	return items, nil
 }
 
 // ownedParticle — запись существует и принадлежит текущему пользователю.
 func (u *Usecase) ownedParticle(ctx context.Context, id uint) (*models.Particle, error) {
+	userID, err := currentUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	particle, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, notFoundErr(err, "particle_not_found", "Услуга не найдена")
 	}
-	if particle.CreatorID != auth.Get().ID {
+	if particle.CreatorID != userID {
 		return nil, apperror.Forbidden("Изменять можно только свои услуги")
 	}
 	return particle, nil
+}
+
+func currentUserID(ctx context.Context) (uint, error) {
+	userID, ok := auth.UserID(ctx)
+	if !ok {
+		return 0, apperror.Unauthorized("Требуется авторизация")
+	}
+	return userID, nil
 }
 
 func (u *Usecase) upload(ctx context.Context, kind string, file *UploadedFile, maxSize int64, allowedTypes string, at time.Time) (string, error) {
