@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"particleapp/internal/apperror"
 	"particleapp/internal/auth"
 	"particleapp/internal/models"
@@ -20,8 +18,8 @@ const (
 	maxPasswordLength = 72
 )
 
-// Register — POST /api/users. Проверяет занятость email, хеширует пароль
-// и создаёт пользователя. Идентификатор и дата регистрации — на бэкенде.
+// Register — POST /api/users. Проверяет занятость email
+// и создаёт пользователя (пароль хранится как есть, по требованию лабораторной). Идентификатор и дата регистрации — на бэкенде.
 func (u *Usecase) Register(ctx context.Context, request RegisterRequest) (*UserResponse, error) {
 	username := strings.TrimSpace(request.Username)
 	email := strings.ToLower(strings.TrimSpace(request.Email))
@@ -42,12 +40,7 @@ func (u *Usecase) Register(ctx context.Context, request RegisterRequest) (*UserR
 		return nil, apperror.Internal("Не удалось проверить email")
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, apperror.Internal("Не удалось зашифровать пароль")
-	}
-
-	registered := models.User{Username: username, Email: email, PasswordHash: string(hash)}
+	registered := models.User{Username: username, Email: email, Password: request.Password}
 	if err := u.repo.CreateUser(ctx, &registered); err != nil {
 		if errors.Is(err, storage.ErrDuplicatedKey) {
 			return nil, apperror.Conflict("email_taken", "Пользователь с таким email уже зарегистрирован")
@@ -73,7 +66,7 @@ func (u *Usecase) Login(ctx context.Context, request LoginRequest) (*LoginRespon
 		}
 		return nil, apperror.Internal("Не удалось выполнить вход")
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(found.PasswordHash), []byte(request.Password)); err != nil {
+	if found.Password != request.Password {
 		return nil, apperror.Unauthorized("Неверный email или пароль")
 	}
 

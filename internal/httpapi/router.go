@@ -80,12 +80,22 @@ func authenticate(tokens *auth.Manager, next http.Handler) http.Handler {
 
 		parts := strings.Fields(header)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+			// Публичные методы работают независимо от токена: с некорректным
+			// заголовком запрос обрабатывается как от гостя.
+			if publicRoute(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			web.WriteError(w, apperror.Unauthorized("Ожидается заголовок Authorization: Bearer <token>"))
 			return
 		}
 
 		claims, err := tokens.Parse(r.Context(), parts[1])
 		if err != nil {
+			if publicRoute(r) && errors.Is(err, auth.ErrInvalidToken) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if errors.Is(err, auth.ErrInvalidToken) {
 				web.WriteError(w, apperror.Unauthorized("JWT недействителен или отозван"))
 			} else {

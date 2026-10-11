@@ -165,8 +165,8 @@ func (u *Usecase) Create(ctx context.Context, request CreateRequest) (*ParticleR
 	return &items[0], nil
 }
 
-// Publish — PUT /api/particles/{id}/publish. Смена статуса draft -> published.
-// Возврат в черновик не предусмотрен.
+// Publish — PUT /api/particles/{id}/publish. Смена статуса draft -> published
+// с проставлением даты формирования. Возврат в черновик не предусмотрен.
 func (u *Usecase) Publish(ctx context.Context, id uint, request PublishRequest) (*ParticleResponse, error) {
 	particle, err := u.ownedParticle(ctx, id)
 	if err != nil {
@@ -284,7 +284,7 @@ func (u *Usecase) responses(ctx context.Context, particles []models.Particle) ([
 
 	items := make([]ParticleResponse, 0, len(particles))
 	for _, particle := range particles {
-		items = append(items, newParticleResponse(particle, stats[particle.ID], u.files))
+		items = append(items, newParticleResponse(particle, stats[particle.ID], u.files, viewerID))
 	}
 	return items, nil
 }

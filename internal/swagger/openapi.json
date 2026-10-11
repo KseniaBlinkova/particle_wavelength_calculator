@@ -3,7 +3,7 @@
   "info": {
     "title": "Particle Wavelength Calculator API",
     "version": "4.0.0",
-    "description": "REST API лабораторной работы №4. Чтение списка и ленты публичное; методы создателя требуют JWT."
+    "description": "REST API лабораторной работы №4. Чтение списка и ленты публичное и работает независимо от токена (с недействительным JWT — как гость); методы создателя требуют JWT."
   },
   "servers": [{"url": "/api"}],
   "tags": [
@@ -194,7 +194,7 @@
       },
       "Particle": {
         "type": "object",
-        "required": ["id", "name", "full_description", "spin", "image_url", "video_url", "likes_count", "is_liked", "created_at"],
+        "required": ["id", "name", "full_description", "spin", "image_url", "video_url", "likes_count", "is_liked", "is_mine", "created_at", "formed_at"],
         "properties": {
           "id": {"type": "integer", "format": "uint64"},
           "name": {"type": "string"},
@@ -204,8 +204,10 @@
           "image_url": {"type": "string", "format": "uri"},
           "video_url": {"type": "string", "format": "uri"},
           "likes_count": {"type": "integer"},
-          "is_liked": {"type": "integer", "enum": [0, 1]},
-          "created_at": {"type": "string", "format": "date-time"}
+          "is_liked": {"type": "integer", "enum": [0, 1], "description": "1, если текущий пользователь лайкнул услугу"},
+          "is_mine": {"type": "integer", "enum": [0, 1], "description": "1, если текущий пользователь — создатель услуги"},
+          "created_at": {"type": "string", "format": "date-time", "description": "Дата создания черновика"},
+          "formed_at": {"type": "string", "format": "date-time", "nullable": true, "description": "Дата публикации (формирования)"}
         }
       },
       "MassRange": {

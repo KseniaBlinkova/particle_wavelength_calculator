@@ -36,6 +36,7 @@ type Particle struct {
 	Wavelength      float64        `gorm:"type:double precision"`
 	CreatorID       uint           `gorm:"type:integer;not null;uniqueIndex:idx_particles_one_draft_per_creator,where:status = 'draft'"`
 	CreatedAt       time.Time      `gorm:"type:timestamp without time zone"`
+	FormedAt        *time.Time     `gorm:"type:timestamp without time zone"`
 	CompletedAt     *time.Time     `gorm:"type:timestamp without time zone"`
 
 	Creator User `gorm:"foreignKey:CreatorID"`

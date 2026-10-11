@@ -11,16 +11,18 @@ import (
 // (creator_id, image_key, video_key, completed_at) наружу
 // не отдаются: клиент получает только публичные ссылки и вычисленные признаки.
 type ParticleResponse struct {
-	ID              uint      `json:"id"`
-	Name            string    `json:"name"`
-	FullDescription string    `json:"full_description"`
-	Mass            *float64  `json:"mass"`
-	Spin            string    `json:"spin"`
-	ImageURL        string    `json:"image_url"`
-	VideoURL        string    `json:"video_url"`
-	LikesCount      int       `json:"likes_count"`
-	IsLiked         int       `json:"is_liked"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              uint       `json:"id"`
+	Name            string     `json:"name"`
+	FullDescription string     `json:"full_description"`
+	Mass            *float64   `json:"mass"`
+	Spin            string     `json:"spin"`
+	ImageURL        string     `json:"image_url"`
+	VideoURL        string     `json:"video_url"`
+	LikesCount      int        `json:"likes_count"`
+	IsLiked         int        `json:"is_liked"`
+	IsMine          int        `json:"is_mine"`
+	CreatedAt       time.Time  `json:"created_at"`
+	FormedAt        *time.Time `json:"formed_at"`
 }
 
 type MassRange struct {
@@ -87,7 +89,7 @@ type LikeRequest struct {
 	Liked int `json:"liked"`
 }
 
-func newParticleResponse(particle models.Particle, stat models.LikeStat, files Files) ParticleResponse {
+func newParticleResponse(particle models.Particle, stat models.LikeStat, files Files, viewerID uint) ParticleResponse {
 	return ParticleResponse{
 		ID:              particle.ID,
 		Name:            particle.Name,
@@ -98,7 +100,9 @@ func newParticleResponse(particle models.Particle, stat models.LikeStat, files F
 		VideoURL:        files.URL(particle.VideoKey, defaultVideoKey),
 		LikesCount:      stat.Count,
 		IsLiked:         flag(stat.LikedByMe),
+		IsMine:          flag(viewerID != 0 && particle.CreatorID == viewerID),
 		CreatedAt:       particle.CreatedAt,
+		FormedAt:        particle.FormedAt,
 	}
 }
 

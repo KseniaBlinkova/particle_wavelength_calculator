@@ -92,7 +92,10 @@ func (s *Store) UpdateContent(ctx context.Context, id uint, mass *float64, spin,
 // Это делает смену статуса атомарной и не даёт опубликовать запись повторно.
 func (s *Store) UpdateStatus(ctx context.Context, id, ownerID uint, from, to models.ParticleStatus, at time.Time) (bool, error) {
 	updates := map[string]any{"status": to}
-	if to == models.StatusDeleted {
+	switch to {
+	case models.StatusPublished:
+		updates["formed_at"] = at
+	case models.StatusDeleted:
 		updates["completed_at"] = at
 	}
 
