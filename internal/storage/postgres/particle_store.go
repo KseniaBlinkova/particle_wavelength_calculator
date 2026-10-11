@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,16 +11,12 @@ import (
 	"particleapp/internal/storage"
 )
 
-func (s *Store) ListPublished(ctx context.Context, name string, minMass *float64) ([]models.Particle, error) {
+func (s *Store) ListPublished(ctx context.Context, minMass *float64) ([]models.Particle, error) {
 	query := s.db.WithContext(ctx).
 		Where("particles.status = ?", models.StatusPublished)
 
 	if minMass != nil {
 		query = query.Where("particles.mass >= ?", *minMass)
-	}
-
-	if name != "" {
-		query = query.Where("particles.name ILIKE ?", "%"+escapeLike(name)+"%")
 	}
 
 	var particles []models.Particle
@@ -182,9 +177,4 @@ func (s *Store) oneParticle(ctx context.Context, query *gorm.DB) (*models.Partic
 		return nil, err
 	}
 	return &particle, nil
-}
-
-func escapeLike(value string) string {
-	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-	return replacer.Replace(value)
 }

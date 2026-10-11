@@ -11,7 +11,7 @@ import (
 type Repository interface {
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id uint) (*models.User, error)
-	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	GetUserByLogin(ctx context.Context, login string) (*models.User, error)
 }
 
 // Domain — бизнес-логика домена «пользователь»:

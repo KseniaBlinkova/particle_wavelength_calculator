@@ -12,38 +12,35 @@ import (
 )
 
 const (
-	minUsernameLength = 3
-	maxUsernameLength = 50
+	minLoginLength    = 3
+	maxLoginLength    = 50
 	minPasswordLength = 6
 	maxPasswordLength = 72
 )
 
-// Register — POST /api/users. Проверяет занятость email
-// и создаёт пользователя (пароль хранится как есть, по требованию лабораторной). Идентификатор и дата регистрации — на бэкенде.
+// Register — POST /api/users. Проверяет занятость логина и создаёт
+// пользователя (пароль хранится как есть, по требованию лабораторной).
+// Идентификатор и дата регистрации — на бэкенде.
 func (u *Usecase) Register(ctx context.Context, request RegisterRequest) (*UserResponse, error) {
-	username := strings.TrimSpace(request.Username)
-	email := strings.ToLower(strings.TrimSpace(request.Email))
+	login := strings.TrimSpace(request.Login)
 
-	if err := validateUsername(username); err != nil {
-		return nil, err
-	}
-	if err := validateEmail(email); err != nil {
+	if err := validateLogin(login); err != nil {
 		return nil, err
 	}
 	if err := validatePassword(request.Password); err != nil {
 		return nil, err
 	}
 
-	if _, err := u.repo.GetUserByEmail(ctx, email); err == nil {
-		return nil, apperror.Conflict("email_taken", "Пользователь с таким email уже зарегистрирован")
+	if _, err := u.repo.GetUserByLogin(ctx, login); err == nil {
+		return nil, apperror.Conflict("login_taken", "Пользователь с таким логином уже зарегистрирован")
 	} else if !errors.Is(err, storage.ErrNotFound) {
-		return nil, apperror.Internal("Не удалось проверить email")
+		return nil, apperror.Internal("Не удалось проверить логин")
 	}
 
-	registered := models.User{Username: username, Email: email, Password: request.Password}
+	registered := models.User{Login: login, Password: request.Password}
 	if err := u.repo.CreateUser(ctx, &registered); err != nil {
 		if errors.Is(err, storage.ErrDuplicatedKey) {
-			return nil, apperror.Conflict("email_taken", "Пользователь с таким email уже зарегистрирован")
+			return nil, apperror.Conflict("login_taken", "Пользователь с таким логином уже зарегистрирован")
 		}
 		return nil, apperror.Internal("Не удалось зарегистрировать пользователя")
 	}
@@ -52,22 +49,22 @@ func (u *Usecase) Register(ctx context.Context, request RegisterRequest) (*UserR
 	return &response, nil
 }
 
-// Login — POST /api/users/login. Проверяет пароль и выдаёт подписанный JWT.
+// Login — POST /api/users/login. Проверяет логин и пароль и выдаёт подписанный JWT.
 func (u *Usecase) Login(ctx context.Context, request LoginRequest) (*LoginResponse, error) {
-	email := strings.ToLower(strings.TrimSpace(request.Email))
-	if err := validateEmail(email); err != nil {
-		return nil, apperror.Unauthorized("Неверный email или пароль")
+	login := strings.TrimSpace(request.Login)
+	if login == "" || request.Password == "" {
+		return nil, apperror.Unauthorized("Неверный логин или пароль")
 	}
 
-	found, err := u.repo.GetUserByEmail(ctx, email)
+	found, err := u.repo.GetUserByLogin(ctx, login)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, apperror.Unauthorized("Неверный email или пароль")
+			return nil, apperror.Unauthorized("Неверный логин или пароль")
 		}
 		return nil, apperror.Internal("Не удалось выполнить вход")
 	}
 	if found.Password != request.Password {
-		return nil, apperror.Unauthorized("Неверный email или пароль")
+		return nil, apperror.Unauthorized("Неверный логин или пароль")
 	}
 
 	token, err := u.tokens.Issue(found.ID)
@@ -93,17 +90,13 @@ func (u *Usecase) Logout(ctx context.Context) error {
 	return nil
 }
 
-func validateUsername(username string) error {
-	length := len([]rune(username))
-	if length < minUsernameLength || length > maxUsernameLength {
-		return apperror.Validation("Имя пользователя должно быть от 3 до 50 символов")
+func validateLogin(login string) error {
+	length := len([]rune(login))
+	if length < minLoginLength || length > maxLoginLength {
+		return apperror.Validation("Логин должен быть от 3 до 50 символов")
 	}
-	return nil
-}
-
-func validateEmail(email string) error {
-	if email == "" || len(email) > 100 || !strings.Contains(email, "@") || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@") {
-		return apperror.Validation("Некорректный email")
+	if strings.ContainsAny(login, " \t\n") {
+		return apperror.Validation("Логин не должен содержать пробелов")
 	}
 	return nil
 }

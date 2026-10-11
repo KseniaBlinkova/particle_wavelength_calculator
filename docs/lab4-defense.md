@@ -2,8 +2,8 @@
 
 ## Что именно требовалось реализовать
 
-1. Регистрацию с уникальным email (пароль хранится без хеширования, по требованию преподавателя).
-2. Аутентификацию: проверку email/пароля и выдачу JWT.
+1. Регистрацию с уникальным логином (пароль хранится без хеширования, по требованию преподавателя).
+2. Аутентификацию: проверку логина и пароля и выдачу JWT.
 3. Авторизацию: публичное чтение списка и ленты, защищённые методы создателя.
 4. Автоматическое заполнение `creator_id` из JWT, а не из тела запроса.
 5. Logout через Redis blacklist: отозванный JWT больше не принимается.
@@ -102,9 +102,9 @@ ParticleDomain.Like(id: uint, liked: int): LikeResponse
 
 Порядок сообщений бизнес-процесса:
 
-1. `POST /users` → `Register(username, email, password)` → пользователь.
-2. `POST /users/login` → `Login(email, password)` → JWT и пользователь.
-3. `GET /particles?name=&min_mass=` → `List(filter)` → список.
+1. `POST /users` → `Register(login, password)` → пользователь.
+2. `POST /users/login` → `Login(login, password)` → JWT и пользователь.
+3. `GET /particles?min_mass=` → `List(filter)` → список.
 4. `POST /particles` с JWT и multipart → middleware проверяет JWT →
    `Create(name, mass, spin, description, image, video)` → черновик.
 5. `GET /particles/draft` с JWT → `Draft()` → свой черновик.

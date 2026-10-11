@@ -29,9 +29,9 @@ func (s *Store) GetUserByID(ctx context.Context, id uint) (*models.User, error) 
 	return &user, nil
 }
 
-func (s *Store) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+func (s *Store) GetUserByLogin(ctx context.Context, login string) (*models.User, error) {
 	var user models.User
-	if err := s.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("login = ?", login).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, storage.ErrNotFound
 		}

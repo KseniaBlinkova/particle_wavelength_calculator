@@ -10,13 +10,12 @@ import (
 
 // Filter — параметры фильтрации списка услуг (GET /api/particles).
 type Filter struct {
-	Name    string
 	MinMass *float64
 }
 
 // Repository — порт хранения, который реализует internal/storage/postgres.
 type Repository interface {
-	ListPublished(ctx context.Context, name string, minMass *float64) ([]models.Particle, error)
+	ListPublished(ctx context.Context, minMass *float64) ([]models.Particle, error)
 	FirstPublished(ctx context.Context) (*models.Particle, error)
 	GetNextPublished(ctx context.Context, id uint) (*models.Particle, error)
 	GetPublishedByID(ctx context.Context, id uint) (*models.Particle, error)

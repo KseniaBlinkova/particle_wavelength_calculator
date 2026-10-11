@@ -50,12 +50,38 @@ func New(dsn string) (*Store, error) {
 	if err := db.WithContext(ctx).AutoMigrate(&models.User{}, &models.Particle{}, &models.Like{}); err != nil {
 		return nil, fmt.Errorf("миграция схемы: %w", err)
 	}
+
+	// Услуги, опубликованные до появления formed_at, получают дату
+	// формирования, равную дате создания: другой информации о них нет.
+	if err := db.WithContext(ctx).Model(&models.Particle{}).
+		Where("status = ? AND formed_at IS NULL", models.StatusPublished).
+		Update("formed_at", gorm.Expr("created_at")).Error; err != nil {
+		return nil, fmt.Errorf("заполнение formed_at: %w", err)
+	}
 	return &Store{db: db}, nil
 }
 
 // normalizeLegacyData делает повторный запуск миграций безопасным
 // для базы, созданной предыдущей версией проекта.
 func normalizeLegacyData(ctx context.Context, db *gorm.DB) error {
+	// Пользователь теперь состоит только из логина и пароля: прежний
+	// username становится логином, email и password_hash удаляются.
+	if db.Migrator().HasTable(&models.User{}) {
+		migrator := db.WithContext(ctx).Migrator()
+		if migrator.HasColumn(&models.User{}, "username") && !migrator.HasColumn(&models.User{}, "login") {
+			if err := migrator.RenameColumn(&models.User{}, "username", "login"); err != nil {
+				return err
+			}
+		}
+		for _, column := range []string{"email", "password_hash"} {
+			if migrator.HasColumn(&models.User{}, column) {
+				if err := migrator.DropColumn(&models.User{}, column); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	if db.Migrator().HasTable(&models.Like{}) {
 		// Оставляем самый ранний лайк для каждой пары user_id/particle_id.
 		if err := db.WithContext(ctx).Exec(`

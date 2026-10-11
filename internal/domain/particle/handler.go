@@ -40,12 +40,12 @@ func Register(mux *http.ServeMux, domain Domain) {
 	})
 }
 
-// list — GET /api/particles?min_mass=&name=
+// list — GET /api/particles?min_mass=
 func list(domain Domain) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 
-		filter := Filter{Name: strings.TrimSpace(query.Get("name"))}
+		var filter Filter
 		if raw := query.Get("min_mass"); raw != "" {
 			minMass, err := strconv.ParseFloat(raw, 64)
 			if err != nil || minMass < 0 || math.IsNaN(minMass) || math.IsInf(minMass, 0) {

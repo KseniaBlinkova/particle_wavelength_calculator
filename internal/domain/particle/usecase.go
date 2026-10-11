@@ -28,10 +28,10 @@ const (
 )
 
 // List — GET /api/particles. Только опубликованные услуги с фильтрацией
-// по минимальной массе и поиском по названию. Записи в статусе deleted
+// по минимальной массе (как в лабораторной №1). Записи в статусе deleted
 // и черновики в выборку не попадают.
 func (u *Usecase) List(ctx context.Context, filter Filter) (ListResponse, error) {
-	particles, err := u.repo.ListPublished(ctx, filter.Name, filter.MinMass)
+	particles, err := u.repo.ListPublished(ctx, filter.MinMass)
 	if err != nil {
 		return ListResponse{}, apperror.Internal("Не удалось получить список услуг")
 	}
